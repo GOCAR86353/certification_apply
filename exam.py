@@ -22,6 +22,12 @@ import pyperclip as pc
 import re
 from bs4 import BeautifulSoup
 
+#option
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('-enable-webgl')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+
 #@retry(stop_max_attempt_number = 2)
 #初始值
 account = ""#帳號
@@ -58,8 +64,8 @@ if (os.path.isdir(os.path.join(os.getcwd(), 'Test'))) and (os.path.isfile(os.pat
     pwd = mylist[1]
     certifacation = mylist[2]
     area = mylist[3]
-    print(account+'\n' + pwd+ '\n'+ area+ '\n'+ certifacation)
-    logger.info('有後門資料，更改查詢資料為'+account+'\n' + pwd + '\n'+ area+ '\n'+ certifacation)
+    print(area+ '\n'+ certifacation)
+    logger.info('有後門資料，更改查詢資料為'+ area+ '\n'+ certifacation)
 #後門
 #驗證碼辨識
 def screenshot_code_verificate(path):
@@ -84,7 +90,7 @@ def screenshot_code_verificate(path):
     return res
 #從登入網站到選擇日期
 def run():
-    logger.info('啟動預定程式序號為'+'(0表示尚未取得當日訂位;1表示僅取得1900訂位;2表示僅取得2000訂位)')
+    logger.info('啟動程式')
     driver.implicitly_wait(240)
     driver.get(url)
     time.sleep(2)
@@ -105,6 +111,7 @@ def run():
     ans_int = int(ans[:1])+int(ans[2:3])
     ans = str(ans_int)
     print(ans)
+    logger.info('驗證碼輸入值為'+ans)
     time.sleep(0.5)
     pc.copy(ans)
     driver.find_element("xpath",'//*[@id="wrapper"]/main/div[2]/div/div[1]/div[3]/div[2]/div[1]/input[2]').click() #驗證碼
@@ -115,16 +122,24 @@ def run():
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="wrapper"]/header/div[2]/div/ul[2]/li[3]/a'))
     ).click()#證照
+    logger.info('登入成功並點選證照鍵')
     '''
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="wrapper"]/header/div[2]/div/ul[2]/li[3]/div/div[2]/ul/li[2]/a'))
     ).click()#證照搜尋
     '''
-    time.sleep(2)
+    time.sleep(1)
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, '//*[@id="popupUIClose"]/button'))
+    ).click()#證照
+    logger.info('有公告訊息視窗，把她按掉')
+    
+    '''
     if driver.find_element("xpath",'//*[@id="popupUIClose"]/button'):
         time.sleep(0.5)
         driver.find_element("xpath",'//*[@id="popupUIClose"]/button').click()
-        logger.info('有公告訊息視窗，把她按掉')
+    '''    
+        
     # 等待請選擇證照名稱下拉選單元件
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_ContentPlaceHolder1_QuickSearch_LicenseSearchBar1_ddlTestName"]'))
@@ -138,6 +153,7 @@ def run():
         raise ValueError(certifacation + 'is not in' + text)
     select = Select(driver.find_element("xpath",'//*[@id="ctl00_ContentPlaceHolder1_QuickSearch_LicenseSearchBar1_ddlTestName"]'))
     select.select_by_visible_text(certifacation)
+    logger.info('選擇查詢證照'+certifacation)
     time.sleep(1)
     # 等待請選擇考區下拉選單元件
     WebDriverWait(driver, 10).until(
@@ -153,21 +169,15 @@ def run():
     select = Select(driver.find_element("xpath",'//*[@id="ctl00_ContentPlaceHolder1_QuickSearch_LicenseSearchBar1_ddlTestArea"]'))
     select.select_by_visible_text(area)
     time.sleep(1)
+    logger.info('選擇考試區域'+area)
     driver.find_element("xpath",'//*[@id="ctl00_ContentPlaceHolder1_QuickSearch_btnSearch"]').click()
     time.sleep(1)
+    logger.info('查詢開始')
     
-    #抓取當頁表格
 
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id="wrapper"]/main/section/div/table'))
-    )
-    table = driver.find_element("xpath",'//*[@id="wrapper"]/main/section/div/table').text
-
-    print(table)
-
-    soup = BeautifulSoup(driver.page_source, "html5lib")
-    id = soup.find_all('id')
-
+    #soup = BeautifulSoup(driver.page_source, "html5lib")
+    #htmlvalue = soup.find_all('td',string = '測驗時間')
+    
     #抓取頁數表格並判斷最大頁數
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_ContentPlaceHolder1_LicenseProductList1_RPT_Paginate"]'))
@@ -184,23 +194,130 @@ def run():
         # num_list_new = page[1]
         page_max=int(''.join(page[1]))
     print(page_max)
+    logger.info(f'取得頁數共{page_max}頁')
 
-    #for i in range(int(page_max)):
-        #print(str(i))
+    if int(page_max) >= 1:
+        for i in range(1,int(page_max)+1):
+            #抓取當頁表格列數
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//*[@id="wrapper"]/main/section/div/table'))
+            )
+            table = driver.find_element("xpath",'//*[@id="wrapper"]/main/section/div/table').text
+            print(table)
+            table_row = table.count(certifacation)
+            print(table_row)
+            logger.info(f'取得第{i}頁列數:'+ f'共{table_row}筆')
+            for j in range(1,int(table_row)+1):
+                test_time = driver.find_element("xpath",f'//*[@id="wrapper"]/main/section/div/table/tbody/tr[{j}]/td[4]').text
+                print(test_time)
+                logger.info(f'取得第{i}頁第{j}筆考試時間資料:'+ f'資料內容為{test_time}')
+                if '六' in test_time or '日' in test_time:
+                    apply_status = driver.find_element("xpath",f'//*[@id="wrapper"]/main/section/div/table/tbody/tr[{j}]/td[6]').text
+                    print(apply_status)
+                    logger.info(f'取得第{i}頁第{j}筆考試假日可取號狀態:'+ f'{apply_status}')
+                    if apply_status == '可取號':
+                        driver.find_element("xpath",f'//*[@id="ctl00_ContentPlaceHolder1_LicenseProductList1_RPT_Test_ctl0{j}_lbtnSend"]').click()
+                        get_apply = 'ok'
+                        logger.info(f'第{i}頁第{j}筆假日成功取號')
+                        break
+                    else:
+                        get_apply = f'第{i}頁第{j}筆假日無法取號'
+                        logger.info(get_apply)
+                
+                elif '18:50' in test_time:
+                    apply_status = driver.find_element("xpath",f'//*[@id="wrapper"]/main/section/div/table/tbody/tr[{j}]/td[6]').text
+                    print(apply_status)
+                    logger.info(f'取得第{i}頁第{j}筆考試平日晚上可取號狀態:'+ f'{apply_status}')
+                    if apply_status == '可取號':
+                        driver.find_element("xpath",f'//*[@id="ctl00_ContentPlaceHolder1_LicenseProductList1_RPT_Test_ctl0{j}_lbtnSend"]').click()
+                        get_apply = 'ok'
+                        logger.info(f'第{i}頁第{j}筆平日晚上成功取號')
+                        break
+                    else:
+                        get_apply = f'第{i}頁第{j}筆平日晚上無法取號'
+                        logger.info(get_apply)
+                else:
+                    get_apply = '第'+str(i)+f'頁第{j}筆不符合假日與平日晚上'
+                    logger.info(get_apply)
+                    print(get_apply)
+                    
+            if get_apply == 'ok':
+                break
+            else:
+                logger.info(f'第{i}頁無可取號場次')
+            driver.find_element("xpath",'//*[@id="ctl00_ContentPlaceHolder1_LicenseProductList1_lbtnNextPageNum"]').click()
+    else:
+        #抓取當頁表格列數
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="wrapper"]/main/section/div/table'))
+        )
+        table = driver.find_element("xpath",'//*[@id="wrapper"]/main/section/div/table').text
+        print(table)
+        table_row = table.count(certifacation)
+        print(table_row)
+        logger.info(f'此次查詢僅一頁共{table_row}筆')
+        for j in range(1,int(table_row)+1):
+            test_time = driver.find_element("xpath",f'//*[@id="wrapper"]/main/section/div/table/tbody/tr[{j}]/td[4]').text
+            print(test_time)
+            logger.info(f'取得第{j}筆考試時間資料:'+ f'資料內容為{test_time}')
+            if '六' in test_time or '日' in test_time:
+                apply_status = driver.find_element("xpath",f'//*[@id="wrapper"]/main/section/div/table/tbody/tr[{j}]/td[6]').text
+                print(apply_status)
+                logger.info(f'取得第{j}筆考試假日可取號狀態:'+ f'{apply_status}')
+                if apply_status == '可取號':
+                    driver.find_element("xpath",f'//*[@id="ctl00_ContentPlaceHolder1_LicenseProductList1_RPT_Test_ctl0{j}_lbtnSend"]').click()
+                    get_apply = 'ok'
+                    logger.info(f'第{j}筆假日成功取號')
+                    break
+                else:
+                    get_apply = f'第{j}筆假日無法取號'
+                    logger.info(get_apply)
+            elif '18:50' in test_time:
+                apply_status = driver.find_element("xpath",f'//*[@id="wrapper"]/main/section/div/table/tbody/tr[{j}]/td[6]').text
+                print(apply_status)
+                logger.info(f'取得第{j}筆考試平日晚上可取號狀態:'+ f'{apply_status}')
+                if apply_status == '可取號':
+                    driver.find_element("xpath",f'//*[@id="ctl00_ContentPlaceHolder1_LicenseProductList1_RPT_Test_ctl0{j}_lbtnSend"]').click()
+                    get_apply = 'ok'
+                    logger.info(f'第{j}筆平日晚上成功取號')
+                    break
+                else:
+                    get_apply = f'第{j}筆平日晚上無法取號'
+                    logger.info(get_apply)
+            else:
+                get_apply = f'第{j}筆不符合假日與平日晚上'
+                logger.info(get_apply)
+                print(get_apply)
+    if get_apply == 'ok':
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_ContentPlaceHolder1_ExamDetail_btnGetTicket"]'))
+        )
+
+        bookok  = driver.find_element("xpath",'//*[@id="ctl00_ContentPlaceHolder1_ExamDetail_btnGetTicket"]')
+        bookok.send_keys("\n")
 
 
-    return True
-    '''
-    #driver.find_element("xpath",'//*[@id="USERNAME"]').send_keys(account) #帳號
-    '''
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_ContentPlaceHolder1_ExamDetail_imgbtnShopping"]'))
+        )
+        driver.get_screenshot_as_file(success_pic)
+        logger.info(f'取號成功！報名時間為：{test_time}')
+        return get_apply + test_time
+    else:
+        return 'fail'
+
 attemps = 0
 success = False
 while attemps < 3 and not success:#重複執行，最多錯3次
     try:
-        driver = webdriver.Chrome()
+
+        driver = webdriver.Chrome(options=chrome_options)
         nexttime = run()#執行登入到選取預定日期
-        logger.info('此次程式執行結果為'+'(0表示尚未取得當日訂位;1表示僅取得1900訂位;2表示僅取得2000訂位;12表示兩個時段都訂位成功)')
-        success = nexttime
+        if  'ok' in nexttime:
+            logger.info(f'此次程式執行結果為ok，取號成功，取號日期為{nexttime[2:]}')
+        else:
+            logger.info('程式執行完成，無可取號之場次！')
+        success = True
     except Exception as e:
         #img = ImageGrab.grab()
         attemps+=1
