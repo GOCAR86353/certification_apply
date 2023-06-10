@@ -21,6 +21,7 @@ import logging
 import pyperclip as pc
 import re
 from bs4 import BeautifulSoup
+from mailwithattach import gmail #請引用mailwithattach_example
 
 #option
 chrome_options = webdriver.ChromeOptions()
@@ -315,8 +316,10 @@ while attemps < 3 and not success:#重複執行，最多錯3次
         nexttime = run()#執行登入到選取預定日期
         if  'ok' in nexttime:
             logger.info(f'此次程式執行結果為ok，取號成功，取號日期為{nexttime[2:]}')
+            gmail(f'{certifacation}{area}取號成功，取號日期為{nexttime[2:]}','''<h1>取號成功!!!'</h1>''',log)
         else:
             logger.info('程式執行完成，無可取號之場次！')
+            gmail(f'{certifacation}{area}今日無可取號之場次！',f'''<h1>無可取號之場次！小可惜！</h1>''',log)
         success = True
     except Exception as e:
         #img = ImageGrab.grab()
@@ -331,6 +334,7 @@ while attemps < 3 and not success:#重複執行，最多錯3次
         driver.get_screenshot_as_file(fail)
         logger.error('錯誤發生，今日重新嘗試第'+str(attemps)+'次;')
         logger.error('錯誤行號為:'+str(lastCallStack[1])+';錯誤類行為:'+str(e.__class__.__name__)+';錯誤內容為:'+str(e.args[0]))
+        gmail('發生異常錯誤，請檢查附件log檔',f'''<h1>發生異常錯誤，請檢查附件log檔</h1>''',log)
         driver.close()
         #if attemps == 3:
             #break
